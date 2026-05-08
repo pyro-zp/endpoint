@@ -1730,22 +1730,15 @@
                 document.getElementById('charCount').textContent = `${len} / 4000`;
             });
 
-            // Range sliders (robust version)
-            const sliders = [
-                { id: 'temperature', valueId: 'temperatureValue', fmt: v => parseFloat(v).toFixed(1) },
-                { id: 'topK', valueId: 'topKValue', fmt: v => parseInt(v) },
-                { id: 'similarityThreshold', valueId: 'similarityThresholdValue', fmt: v => parseFloat(v).toFixed(2) }
-            ];
-            
-            sliders.forEach(s => {
-                const el = document.getElementById(s.id);
-                const valEl = document.getElementById(s.valueId);
-                if (el && valEl) {
-                    // input → мгновенно, change → на всякий случай для старых браузеров
-                    ['input', 'change'].forEach(evt => 
-                        el.addEventListener(evt, () => valEl.textContent = s.fmt(el.value))
-                    );
-                }
+            // Range sliders
+            document.getElementById('temperature').addEventListener('input', function() {
+                document.getElementById('temperatureValue').textContent = this.value;
+            });
+            document.getElementById('topK').addEventListener('input', function() {
+                document.getElementById('topKValue').textContent = this.value;
+            });
+            document.getElementById('similarityThreshold').addEventListener('input', function() {
+                document.getElementById('similarityThresholdValue').textContent = this.value;
             });
 
             // File upload
