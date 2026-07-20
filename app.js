@@ -1,16 +1,22 @@
-// ===== Конфигурация =====
+// ============================================================
+// КОНФИГУРАЦИЯ
+// ============================================================
 const API_BASE = "https://d5dn7smcr727ub40o5lt.kocrdvxt.apigw.yandexcloud.net";
 
-// ===== Состояние =====
+// ============================================================
+// СОСТОЯНИЕ
+// ============================================================
 let skills = [];
 let activeSkillKey = null;
 let isLoading = false;
 
-// Хранилище сообщений по каждому скиллу
-// { "sales": [{role, text, step, total_steps}], "crm": [...], ... }
+// История сообщений по каждому скиллу:
+// { "sales": [{role, text, step, totalSteps, isTyping, isReport}], ... }
 const chatHistories = {};
 
-// ===== Session ID =====
+// ============================================================
+// SESSION ID
+// ============================================================
 function getSessionId() {
   let id = localStorage.getItem("bf_session_id");
   if (!id) {
@@ -20,7 +26,9 @@ function getSessionId() {
   return id;
 }
 
-// ===== API =====
+// ============================================================
+// API
+// ============================================================
 async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -37,7 +45,9 @@ async function apiPost(path, data) {
   return res.json();
 }
 
-// ===== DOM =====
+// ============================================================
+// DOM
+// ============================================================
 const $skillList = document.getElementById("skillList");
 const $placeholder = document.getElementById("chatPlaceholder");
 const $chatContainer = document.getElementById("chatContainer");
@@ -49,7 +59,26 @@ const $btnSend = document.getElementById("btnSend");
 const $btnResetSkill = document.getElementById("btnResetSkill");
 const $btnResetAll = document.getElementById("btnResetAll");
 
-// ===== Инициализация =====
+// ============================================================
+// MARKDOWN → RICH TEXT
+// ============================================================
+function renderMarkdown(text) {
+  if (window.marked && window.DOMPurify) {
+    return DOMPurify.sanitize(marked.parse(text));
+  }
+  // Фолбэк, если CDN не загрузился
+  return escapeHtml(text).replace(/\n/g, "<br>");
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ============================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ============================================================
 async function init() {
   try {
     const data = await apiGet("/api/skills");
@@ -57,24 +86,27 @@ async function init() {
     renderSidebar();
   } catch (e) {
     console.error("Не удалось загрузить скиллы:", e);
-    $skillList.innerHTML = '<p style="color:#e94560;padding:12px;">Ошибка загрузки. Обновите страницу.</p>';
+    $skillList.innerHTML =
+      '<p style="color:#e94560;padding:12px;">Ошибка загрузки. Обновите страницу.</p>';
   }
 }
 
-// ===== Sidebar =====
+// ============================================================
+// SIDEBAR
+// ============================================================
 function renderSidebar() {
   $skillList.innerHTML = "";
   skills.forEach(skill => {
     const btn = document.createElement("button");
     btn.className = "skill-btn" + (skill.key === activeSkillKey ? " active" : "");
-    btn.dataset.key = skill.key;
 
     const history = chatHistories[skill.key] || [];
-    const statusText = history.length > 0 ? `💬 ${history.length} сообщ.` : "";
+    const count = history.filter(m => !m.isTyping).length;
+    const statusText = count > 0 ? `💬 ${count} сообщ.` : "";
 
     btn.innerHTML = `
-      <span class="skill-name">${skill.name}</span>
-      <span class="skill-desc">${skill.description}</span>
+      <span class="skill-name">${escapeHtml(skill.name)}</span>
+      <span class="skill-desc">${escapeHtml(skill.description)}</span>
       ${statusText ? `<span class="skill-status">${statusText}</span>` : ""}
     `;
     btn.addEventListener("click", () => selectSkill(skill.key));
@@ -82,19 +114,19 @@ function renderSidebar() {
   });
 }
 
-// ===== Выбор скилла =====
+// ============================================================
+// ВЫБОР СКИЛЛА
+// ============================================================
 async function selectSkill(key) {
   activeSkillKey = key;
   const skill = skills.find(s => s.key === key);
 
-  // UI
   $placeholder.classList.add("hidden");
   $chatContainer.classList.remove("hidden");
   $chatTitle.textContent = skill.name;
   $chatDesc.textContent = skill.description;
   renderSidebar();
 
-  // Если чат пустой — начинаем сессию
   if (!chatHistories[key] || chatHistories[key].length === 0) {
     chatHistories[key] = [];
     renderMessages();
@@ -104,12 +136,20 @@ async function selectSkill(key) {
   }
 }
 
-// ===== Старт скилла =====
+// ============================================================
+// СТАРТ СКИЛЛА: приветствие + первый вопрос
+// ============================================================
 async function startSkill(key) {
   setLoading(true);
   try {
     const data = await apiPost("/api/skill/start", { skill_key: key });
-    addMessage(key, "bot", data.question, data.step, data.total_steps);
+
+    // Приветствие специалиста
+    if (data.greeting) {
+      addMessage(key, "bot", data.greeting);
+    }
+    // Первый вопрос (поле message!)
+    addMessage(key, "bot", data.message, data.step, data.total_steps);
     renderMessages();
   } catch (e) {
     addMessage(key, "bot", "❌ Ошибка запуска скилла. Попробуйте ещё раз.");
@@ -118,33 +158,33 @@ async function startSkill(key) {
   setLoading(false);
 }
 
-// ===== Отправка ответа =====
+// ============================================================
+// ОТВЕТ ПОЛЬЗОВАТЕЛЯ
+// ============================================================
 async function sendAnswer() {
   const text = $input.value.trim();
   if (!text || isLoading || !activeSkillKey) return;
 
   const key = activeSkillKey;
 
-  // Добавляем сообщение пользователя
   addMessage(key, "user", text);
   $input.value = "";
   renderMessages();
 
-  // Отправляем на сервер
   setLoading(true);
-  addMessage(key, "bot", "⏳ Обрабатываю...", null, null, true);
+  addMessage(key, "bot", "", null, null, true); // индикатор "печатает"
   renderMessages();
 
   try {
     const data = await apiPost("/api/chat", { skill_key: key, text });
-
-    // Убираем "обрабатываю"
     removeTyping(key);
 
     if (data.type === "question") {
       addMessage(key, "bot", data.message, data.step, data.total_steps);
     } else if (data.type === "report") {
       addMessage(key, "bot", data.report, null, null, false, true);
+      addMessage(key, "note",
+        "Аудит завершён. Выберите следующий скилл слева или запустите этот заново кнопкой «Сбросить».");
     } else {
       addMessage(key, "bot", data.message || "Готово.");
     }
@@ -157,7 +197,9 @@ async function sendAnswer() {
   setLoading(false);
 }
 
-// ===== Сообщения =====
+// ============================================================
+// СООБЩЕНИЯ
+// ============================================================
 function addMessage(skillKey, role, text, step, totalSteps, isTyping = false, isReport = false) {
   if (!chatHistories[skillKey]) chatHistories[skillKey] = [];
   chatHistories[skillKey].push({ role, text, step, totalSteps, isTyping, isReport });
@@ -173,67 +215,86 @@ function renderMessages() {
   const history = chatHistories[key] || [];
 
   $messages.innerHTML = "";
+
   history.forEach(msg => {
     const div = document.createElement("div");
+
+    // Системная заметка (по центру)
+    if (msg.role === "note") {
+      div.className = "system-note";
+      div.textContent = msg.text;
+      $messages.appendChild(div);
+      return;
+    }
+
+    // Индикатор "печатает"
+    if (msg.isTyping) {
+      div.className = "bubble bot typing";
+      div.innerHTML =
+        '<span class="typing-dots"><span></span><span></span><span></span></span>';
+      $messages.appendChild(div);
+      return;
+    }
+
     let cls = "bubble " + msg.role;
-    if (msg.isReport) cls = "bubble report";
-    if (msg.isTyping) cls += " typing";
+    if (msg.isReport) cls = "bubble bot report";
     div.className = cls;
 
     let html = "";
     if (msg.role === "bot" && msg.step && msg.totalSteps) {
-      html += `<span class="step-badge">Вопрос ${msg.step} / ${msg.totalSteps}</span><br>`;
+      html += `<span class="step-badge">Вопрос ${msg.step} / ${msg.totalSteps}</span>`;
     }
-    html += escapeHtml(msg.text);
+
+    if (msg.role === "bot") {
+      html += renderMarkdown(msg.text);   // бот → rich text
+    } else {
+      html += escapeHtml(msg.text);       // пользователь → обычный текст
+    }
+
     div.innerHTML = html;
     $messages.appendChild(div);
   });
 
-  // Скролл вниз
   $messages.scrollTop = $messages.scrollHeight;
 }
 
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ===== Loading =====
+// ============================================================
+// LOADING
+// ============================================================
 function setLoading(state) {
   isLoading = state;
   $btnSend.disabled = state;
   $input.disabled = state;
 }
 
-// ===== Сброс =====
+// ============================================================
+// СБРОС
+// ============================================================
 async function resetSkill(key) {
-  try {
-    await apiPost("/api/reset", { skill_key: key });
-  } catch (e) { /* ignore */ }
+  try { await apiPost("/api/reset", { skill_key: key }); } catch (e) {}
   chatHistories[key] = [];
+  renderSidebar();
   if (activeSkillKey === key) {
     renderMessages();
     await startSkill(key);
   }
-  renderSidebar();
 }
 
 async function resetAll() {
   for (const key of Object.keys(chatHistories)) {
-    try {
-      await apiPost("/api/reset", { skill_key: key });
-    } catch (e) { /* ignore */ }
+    try { await apiPost("/api/reset", { skill_key: key }); } catch (e) {}
     chatHistories[key] = [];
   }
+  renderSidebar();
   if (activeSkillKey) {
     renderMessages();
     await startSkill(activeSkillKey);
   }
-  renderSidebar();
 }
 
-// ===== Events =====
+// ============================================================
+// СОБЫТИЯ
+// ============================================================
 $btnSend.addEventListener("click", sendAnswer);
 
 $input.addEventListener("keydown", (e) => {
@@ -244,10 +305,14 @@ $input.addEventListener("keydown", (e) => {
 });
 
 $btnResetSkill.addEventListener("click", () => {
-  if (activeSkillKey) resetSkill(activeSkillKey);
+  if (activeSkillKey && !isLoading) resetSkill(activeSkillKey);
 });
 
-$btnResetAll.addEventListener("click", resetAll);
+$btnResetAll.addEventListener("click", () => {
+  if (!isLoading) resetAll();
+});
 
-// ===== Start =====
+// ============================================================
+// СТАРТ
+// ============================================================
 init();
