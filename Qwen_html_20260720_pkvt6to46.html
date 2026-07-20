@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Flow AI Consultant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1>Business Flow AI</h1>
+        <p class="subtitle">Консультант</p>
+      </div>
+      <nav class="skill-list" id="skillList">
+        <!-- Кнопки скиллов генерируются из JS -->
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn-reset" id="btnResetAll">🔄 Сбросить всё</button>
+      </div>
+    </aside>
+
+    <!-- Chat area -->
+    <main class="chat-area" id="chatArea">
+      <!-- Placeholder когда ничего не выбрано -->
+      <div class="chat-placeholder" id="chatPlaceholder">
+        <div class="placeholder-icon">🤖</div>
+        <h2>Выберите аудит слева</h2>
+        <p>Каждый скилл — отдельный чат с вопросами и итоговым отчётом.</p>
+      </div>
+
+      <!-- Chat container (скрыт пока не выбран скилл) -->
+      <div class="chat-container hidden" id="chatContainer">
+        <header class="chat-header" id="chatHeader">
+          <h2 id="chatTitle">—</h2>
+          <span class="chat-desc" id="chatDesc">—</span>
+          <button class="btn-reset-skill" id="btnResetSkill">Сбросить</button>
+        </header>
+
+        <div class="messages" id="messages">
+          <!-- Сообщения -->
+        </div>
+
+        <div class="input-area">
+          <textarea
+            id="userInput"
+            placeholder="Введите ответ..."
+            rows="2"
+          ></textarea>
+          <button id="btnSend" class="btn-send">➤</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
